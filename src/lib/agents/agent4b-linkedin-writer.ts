@@ -1,0 +1,402 @@
+// Agent 4b: LinkedIn Post Writer
+// Model: Claude Sonnet 4 (with thinking enabled)
+// Purpose: Draft LinkedIn posts based on research and theme
+
+import { ChatAnthropic } from "@langchain/anthropic";
+import type {
+  BasicWorkflowState,
+  LinkedInOutput,
+  ResearchDossier,
+  MarketingBrief,
+} from "../schemas/types";
+import { LinkedInOutputSchema } from "../schemas/types";
+import {
+  pineconeSearchTool,
+  getWhitepaperConfigById,
+} from "../tools/pinecone-search";
+import { createClient } from "@supabase/supabase-js";
+
+// Search result interface for Pinecone
+interface SearchResult {
+  id: string;
+  score?: number;
+  text: string;
+  category?: string;
+}
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Function to load agent configuration from database
+async function loadAgentConfig(agentId: string) {
+  const { data, error } = await supabase
+    .from("agent_system_prompts")
+    .select("system_prompt, user_prompt_template, model_name")
+    .eq("agent_id", agentId)
+    .eq("is_active", true)
+    .single();
+
+  if (error) {
+    console.error(`Error loading agent config for ${agentId}:`, error);
+    throw new Error(`Failed to load agent configuration: ${error.message}`);
+  }
+
+  return data;
+}
+
+// Template replacement function
+function fillTemplate(
+  template: string,
+  variables: Record<string, any>
+): string {
+  let result = template;
+
+  for (const [key, value] of Object.entries(variables)) {
+    const placeholder = `{${key}}`;
+    const stringValue =
+      typeof value === "object" ? JSON.stringify(value) : String(value || "");
+    result = result.replace(new RegExp(placeholder, "g"), stringValue);
+  }
+
+  return result;
+}
+
+export async function linkedinWriterAgent(
+  state: BasicWorkflowState
+): Promise<Partial<BasicWorkflowState>> {
+  console.log("💼 Agent 4b: Starting LinkedIn post generation...");
+
+  try {
+    // Validate inputs
+    if (!state.marketingBrief) {
+      throw new Error(
+        "Marketing brief is required for LinkedIn post generation"
+      );
+    }
+
+    if (!state.researchDossier) {
+      throw new Error(
+        "Research dossier is required for LinkedIn post generation"
+      );
+    }
+
+    if (!state.selectedTheme) {
+      throw new Error(
+        "Selected theme is required for LinkedIn post generation"
+      );
+    }
+
+    // Load agent configuration from database
+    const agentConfig = await loadAgentConfig("agent4b");
+    console.log("📋 Loaded agent4b configuration from database");
+
+    // Initialize Claude Sonnet 4 with config from database
+    const baseLlm = new ChatAnthropic({
+      modelName: agentConfig.model_name,
+      temperature: 0.7,
+      maxTokens: 4000,
+      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    // Bind Pinecone search tool for autonomous calling
+    const llm = baseLlm.bindTools([pineconeSearchTool]);
+
+    // Parse the marketing brief from Agent 1 (handles Agent 1 output format)
+    let marketingBrief;
+    try {
+      marketingBrief =
+        typeof state.marketingBrief === "string"
+          ? JSON.parse(state.marketingBrief)
+          : state.marketingBrief;
+    } catch (error) {
+      console.error("❌ Failed to parse marketing brief:", error);
+      throw new Error("Invalid marketing brief format");
+    }
+
+    const researchDossier = state.researchDossier as ResearchDossier;
+    const linkedinPostsCount = state.linkedinPostsCount || 4;
+
+    // Get whitepaper configuration for tool context
+    let whitepaperConfig;
+    let whitepaperTitle = "the selected whitepaper";
+    if (state.selectedWhitepaperId) {
+      try {
+        whitepaperConfig = await getWhitepaperConfigById(
+          state.selectedWhitepaperId
+        );
+        console.log(
+          `📄 Whitepaper config loaded: namespace=${whitepaperConfig.namespace}, index=${whitepaperConfig.indexName}`
+        );
+
+        // Get whitepaper title for context
+        const { supabase } = await import("../supabase");
+        const { data: whitepaper } = await supabase
+          .from("whitepapers")
+          .select("title, filename")
+          .eq("id", state.selectedWhitepaperId)
+          .single();
+
+        if (whitepaper) {
+          whitepaperTitle =
+            whitepaper.title ||
+            whitepaper.filename ||
+            "the selected whitepaper";
+          console.log(`📄 Whitepaper title: ${whitepaperTitle}`);
+        }
+      } catch (error) {
+        console.warn("⚠️ Could not load whitepaper config:", error);
+      }
+    }
+
+    console.log(
+      `💼 Generating ${linkedinPostsCount} LinkedIn post(s) using research dossier...`
+    );
+
+    // Build user prompt using template from database
+    const userPromptVariables = {
+      executiveSummary: marketingBrief.executiveSummary || "Not provided",
+      targetPersona: JSON.stringify(marketingBrief.targetPersona || {}),
+      campaignObjectives: JSON.stringify(
+        marketingBrief.campaignObjectives || []
+      ),
+      keyMessages: JSON.stringify(marketingBrief.keyMessages || []),
+      callToAction: JSON.stringify(marketingBrief.callToAction || {}),
+      selectedThemeTitle: state.selectedTheme.title,
+      selectedThemeDescription: state.selectedTheme.description,
+      selectedThemeWhyItWorks: Array.isArray(state.selectedTheme.whyItWorks)
+        ? state.selectedTheme.whyItWorks.join(" | ")
+        : state.selectedTheme.whyItWorks || "Not specified",
+      keyFindingsCount: researchDossier.whitepaperEvidence.keyFindings.length,
+      keyFindings: researchDossier.whitepaperEvidence.keyFindings
+        .map(
+          (finding, i) =>
+            `${i + 1}. ${finding.claim} (Evidence: ${finding.evidence}) [Confidence: ${finding.confidence}]`
+        )
+        .join("\n"),
+      suggestedConcepts: researchDossier.suggestedConcepts
+        .map(
+          (concept, i) =>
+            `${i + 1}. ${concept.title}\n   Angle: ${concept.angle}\n   Why it works: ${concept.whyItWorks}\n   Key Evidence: ${Array.isArray(concept.keyEvidence) ? concept.keyEvidence.join(" | ") : concept.keyEvidence || "Not specified"}\n   Direction: ${concept.contentDirection}`
+        )
+        .join("\n\n"),
+      linkedinPostsCount,
+      ctaType: state.ctaType,
+      ctaUrlInfo: state.ctaUrl ? ` (URL: ${state.ctaUrl})` : "",
+      whitepaperTitle,
+    };
+
+    // Create the LinkedIn post generation prompt using template
+    const linkedinPrompt = fillTemplate(
+      agentConfig.user_prompt_template,
+      userPromptVariables
+    );
+
+    console.log("🎯 Using system prompt from database");
+    console.log("📝 Using user prompt template from database");
+
+    // Step 1: Optional research phase - determine if additional evidence is needed
+    let researchResults = "";
+    let toolUsageLog = "";
+
+    const needsResearchPrompt = `Based on this research dossier, do you need additional specific evidence from "${whitepaperTitle}" to create compelling LinkedIn posts about "${state.selectedTheme.title}"?
+
+RESEARCH DOSSIER SUMMARY:
+Key Findings: ${researchDossier.whitepaperEvidence?.keyFindings?.map((f) => f.claim).join("; ") || "None"}
+Suggested Concepts: ${researchDossier.suggestedConcepts?.map((c) => c.title).join("; ") || "None"}
+
+Respond with "YES" if you need more specific statistics, case studies, or compelling examples. Respond with "NO" if the dossier provides sufficient evidence.`;
+
+    const researchDecision = await baseLlm.invoke([
+      {
+        role: "system",
+        content:
+          "You are an expert research analyst. Respond with only YES or NO.",
+      },
+      { role: "user", content: needsResearchPrompt },
+    ]);
+
+    const needsResearch = researchDecision.content
+      .toString()
+      .trim()
+      .toUpperCase()
+      .includes("YES");
+
+    if (needsResearch) {
+      console.log("🔍 Agent 4b determined additional research is needed...");
+
+      // Create research-focused LLM with tools
+      const researchLlm = baseLlm.bindTools([pineconeSearchTool]);
+
+      const researchPrompt = `You are a research assistant for LinkedIn content. Search "${whitepaperTitle}" for additional evidence to strengthen posts about "${state.selectedTheme.title}".
+
+CURRENT RESEARCH GAPS:
+Search for LinkedIn-optimized content:
+1. Compelling statistics and metrics for hooks
+2. Real-world success stories and case studies
+3. Thought-provoking insights and quotes
+4. Professional insights and industry trends
+
+Make 1-3 focused searches to gather engaging evidence for LinkedIn posts.`;
+
+      try {
+        const researchResponse = await researchLlm.invoke([
+          {
+            role: "system",
+            content:
+              "Search for specific evidence to strengthen LinkedIn content. Use the search tool to find compelling data.",
+          },
+          { role: "user", content: researchPrompt },
+        ]);
+
+        // Extract and log tool results
+        if (Array.isArray(researchResponse.content)) {
+          const toolCalls = researchResponse.content.filter(
+            (item: any) => item.type === "tool_use"
+          );
+          const textBlocks = researchResponse.content.filter(
+            (item: any) => item.type === "text"
+          );
+
+          toolUsageLog = `Research phase: ${toolCalls.length} tool call(s) made`;
+          console.log(`🔍 ${toolUsageLog}`);
+
+          // Include research summary in final content
+          researchResults =
+            "\n\nADDITIONAL RESEARCH FINDINGS:\n" +
+            toolCalls
+              .map(
+                (call: any, i: number) =>
+                  `Research Query ${i + 1}: ${JSON.stringify(call.input)}`
+              )
+              .join("\n") +
+            (textBlocks.length > 0
+              ? `\nResearch Summary: ${(textBlocks[textBlocks.length - 1] as any)?.text || ""}`
+              : "");
+        }
+      } catch (error) {
+        console.log(
+          "⚠️ Research phase encountered issue, proceeding with dossier only"
+        );
+        researchResults =
+          "\n\nNote: Research phase encountered limitations, using research dossier evidence.";
+      }
+    } else {
+      console.log(
+        "✅ Agent 4b determined research dossier provides sufficient evidence"
+      );
+    }
+
+    // Step 2: Generate structured content with GUARANTEED JSON output
+    console.log(
+      "📝 Generating LinkedIn posts with guaranteed structured output..."
+    );
+
+    const contentPrompt = `${linkedinPrompt}${researchResults}`;
+
+    // Use withStructuredOutput for guaranteed JSON - no parsing needed!
+    const structuredLlm = baseLlm.withStructuredOutput(LinkedInOutputSchema);
+
+    const linkedinOutput = await structuredLlm.invoke([
+      {
+        role: "system",
+        content: `${agentConfig.system_prompt}
+
+POST REQUIREMENTS:
+- Generate exactly ${linkedinPostsCount} LinkedIn post(s)
+- Each post 150-300 words (LinkedIn optimal length)
+- Include engaging hooks, valuable insights, and clear CTAs
+- Vary post structures: insights, questions, stories, statistics
+- Integrate evidence naturally from the research dossier${needsResearch ? " and additional research findings" : ""}
+- Maintain professional credibility while driving engagement
+
+${toolUsageLog ? `RESEARCH CONTEXT: ${toolUsageLog}` : ""}`,
+      },
+      {
+        role: "user",
+        content: contentPrompt,
+      },
+    ]);
+
+    console.log(
+      "💼 LinkedIn posts generated successfully with guaranteed structure!"
+    );
+
+    // Log detailed LinkedIn information
+    console.log("\n📱 GENERATED LINKEDIN POSTS SUMMARY:");
+    console.log("=".repeat(80));
+    console.log(`Total Posts: ${linkedinOutput.posts.length}`);
+    console.log(`Generation Strategy: ${linkedinOutput.generation_strategy}`);
+    console.log(
+      `Whitepaper Utilization: ${linkedinOutput.whitepaper_utilization}`
+    );
+
+    linkedinOutput.posts.forEach((post, index) => {
+      console.log(`\n${"=".repeat(50)}`);
+      console.log(`LINKEDIN POST ${index + 1}`);
+      console.log(`${"=".repeat(50)}`);
+      console.log(`📊 Character Count: ${post.character_count}`);
+      console.log(`🎯 Concept Used: ${post.concept_used}`);
+      console.log(`💡 Hook: ${post.hook}`);
+      console.log(`📞 Call to Action: ${post.call_to_action}`);
+      console.log(`\n📖 Body Preview (first 200 chars):`);
+      console.log(`${post.body.substring(0, 200)}...`);
+    });
+
+    console.log("\n" + "=".repeat(80));
+    console.log("🎉 LINKEDIN GENERATION COMPLETE");
+    console.log("=".repeat(80));
+
+    console.log(
+      `✅ Agent 4b: Generated ${linkedinOutput.posts.length} LinkedIn post(s) successfully`
+    );
+
+    return {
+      linkedinOutput,
+      currentStep: "linkedin_posts_generated",
+    };
+  } catch (error) {
+    console.error("❌ Agent 4b Error:", error);
+    throw new Error(
+      `LinkedIn post generation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+// Helper function for searching whitepaper content for LinkedIn posts
+export async function searchWhitepaperForLinkedIn(
+  query: string,
+  whitepaperConfig: { namespace: string; indexName: string }
+): Promise<SearchResult[]> {
+  try {
+    console.log(
+      `🔍 Searching whitepaper: "${query}" in namespace: ${whitepaperConfig.namespace}`
+    );
+
+    const searchResults = await pineconeSearchTool.invoke({
+      query,
+      whitepaperNamespace: whitepaperConfig.namespace,
+      indexName: whitepaperConfig.indexName,
+      // ORIGINAL CODE (BACKED UP): topK: 10,
+      topK: 10, // Reduced for faster testing
+      topN: 5,
+    });
+
+    // Handle both string and object responses
+    if (typeof searchResults === "string") {
+      try {
+        const parsed = JSON.parse(searchResults);
+        return parsed.results || parsed || [];
+      } catch {
+        return [];
+      }
+    }
+
+    return (searchResults as any)?.results || [];
+  } catch (error) {
+    console.error("Search error:", error);
+    return [];
+  }
+}
