@@ -10,6 +10,7 @@ import DashboardCard from "@/components/DashboardCard";
 import StatBar from "@/components/StatBar";
 import QuickActions from "@/components/QuickActions";
 import ActivityFeed from "@/components/ActivityFeed";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Updated interfaces to match new database structure
 interface DashboardStats {
@@ -88,23 +89,25 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f6f7ff] flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center"
-        >
-          <div className="loading-spinner h-12 w-12 mx-auto mb-4"></div>
-          <p className="text-body text-gray-600">Loading your dashboard...</p>
-        </motion.div>
-      </div>
+      <ProtectedRoute>
+        <div className="min-h-screen bg-[#f6f7ff] flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center"
+          >
+            <div className="loading-spinner h-12 w-12 mx-auto mb-4"></div>
+            <p className="text-body text-gray-600">Loading your dashboard...</p>
+          </motion.div>
+        </div>
+      </ProtectedRoute>
     );
   }
 
   const hasWhitepapers = (stats?.whitepapers || 0) > 0;
 
   return (
-    <>
+    <ProtectedRoute>
       {/* Sidebar */}
       <Sidebar />
 
@@ -225,6 +228,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </DashboardCard>
-    </>
+    </ProtectedRoute>
   );
 }

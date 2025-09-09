@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   CpuChipIcon,
   DocumentTextIcon,
@@ -8,18 +12,31 @@ import {
 } from "@heroicons/react/24/outline";
 
 export default function HomePage() {
+  const router = useRouter();
+  const { isAuthenticated, openPasswordModal } = useAuth();
+
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      // Already authenticated, go directly to dashboard
+      router.push('/dashboard');
+    } else {
+      // Show password modal
+      openPasswordModal();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 h-16">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
           <div className="font-bold text-xl text-gray-900">ContentFlow AI</div>
-          <Link
-            href="/dashboard"
+          <button
+            onClick={handleGetStarted}
             className="inline-flex items-center px-4 py-2 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors focus-visible:focus"
           >
             Developer Start
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -35,13 +52,13 @@ export default function HomePage() {
               articles, LinkedIn posts, and social media content in minutes.
             </p>
             <div className="mt-8">
-              <Link
-                href="/dashboard"
+              <button
+                onClick={handleGetStarted}
                 className="inline-flex items-center px-8 py-4 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl focus-visible:focus"
               >
                 Get Started Free
                 <ArrowRightIcon className="ml-2 w-5 h-5" />
-              </Link>
+              </button>
             </div>
           </div>
         </section>

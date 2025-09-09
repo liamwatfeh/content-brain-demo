@@ -28,6 +28,7 @@ import BrandedLoadingAnimation from "@/components/BrandedLoadingAnimation";
 import SuccessAnimation from "@/components/SuccessAnimation";
 import HelpTooltip from "@/components/HelpTooltip";
 import { useSidebar } from "@/contexts/SidebarContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Updated Types to match backend API
 interface Whitepaper {
@@ -2167,8 +2168,10 @@ function GenerateContentPageContent() {
 
 export default function GenerateContentPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-      <GenerateContentPageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+        <GenerateContentPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }

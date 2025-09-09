@@ -31,6 +31,7 @@ import {
 import Sidebar from "@/components/Sidebar";
 import ContentKitCard from "@/components/ContentKitCard";
 import { useSidebar } from "@/contexts/SidebarContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface ContentGeneration {
   id: string;
@@ -779,7 +780,8 @@ export default function HistoryPage() {
   }, []);
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
+    <ProtectedRoute>
+      <div className="h-screen flex overflow-hidden bg-gray-50">
       <Sidebar />
 
       <div
@@ -1253,6 +1255,7 @@ export default function HistoryPage() {
         </main>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
  

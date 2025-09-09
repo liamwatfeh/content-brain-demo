@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Unbounded, Archivo } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import PasswordModal from "@/components/PasswordModal";
 import React from "react";
 
 const inter = Inter({
@@ -38,9 +40,12 @@ export default function RootLayout({
         className={`${inter.variable} ${unbounded.variable} ${archivo.variable} font-sans antialiased min-h-screen`}
         suppressHydrationWarning
       >
-        <SidebarProvider>
-          <div className="relative">{children}</div>
-        </SidebarProvider>
+        <AuthProvider>
+          <SidebarProvider>
+            <div className="relative">{children}</div>
+            <PasswordModal />
+          </SidebarProvider>
+        </AuthProvider>
       </body>
     </html>
   );

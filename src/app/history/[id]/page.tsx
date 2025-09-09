@@ -29,6 +29,7 @@ import {
 } from "@heroicons/react/20/solid";
 import Sidebar from "@/components/Sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface ContentItem {
   id: string;
@@ -437,23 +438,25 @@ export default function CampaignDetailPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex overflow-hidden bg-gray-50">
-        <Sidebar />
-        <div
-          className={`flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out ${
-            isCollapsed ? "lg:ml-20" : "lg:ml-80"
-          }`}
-        >
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-lg text-gray-600">
-                Loading campaign details...
-              </p>
+      <ProtectedRoute>
+        <div className="h-screen flex overflow-hidden bg-gray-50">
+          <Sidebar />
+          <div
+            className={`flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out ${
+              isCollapsed ? "lg:ml-20" : "lg:ml-80"
+            }`}
+          >
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-lg text-gray-600">
+                  Loading campaign details...
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </ProtectedRoute>
     );
   }
 
