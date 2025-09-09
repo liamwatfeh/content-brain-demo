@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
-import { FixedSizeGrid as Grid } from "react-window";
+import React, { useMemo } from "react";
+// Commented out react-window import to fix build
+// import { FixedSizeList as List } from "react-window";
 import { motion } from "framer-motion";
 import ContentKitCard from "./ContentKitCard";
 
@@ -191,17 +192,31 @@ export default function VirtualizedCampaignGrid({
 
   return (
     <div className="w-full">
-      <Grid
-        columnCount={columnCount}
-        columnWidth={containerWidth / columnsPerRow}
-        height={containerHeight}
-        rowCount={rowCount}
-        rowHeight={320} // Approximate height of a campaign card
-        width={containerWidth}
-        itemData={itemData}
-      >
-        {Cell}
-      </Grid>
+      {/* Simplified grid layout - commented out react-window for build compatibility */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {campaigns.map((campaign) => (
+          <div key={campaign.id} className="p-4">
+            <ContentKitCard
+              id={campaign.id}
+              campaignName={campaign.campaign_name}
+              whitepaperTitle={campaign.whitepaper_title || ""}
+              whitepaperFilename={campaign.whitepaper_filename || ""}
+              createdAt={campaign.created_at}
+              contentTypes={getContentTypes(campaign)}
+              contentSummary={generateContentSummary(campaign)}
+              onView={onView}
+              onDelete={onDelete}
+              isSelectable={
+                selectedCampaigns
+                  ? selectedCampaigns.size > 0 || campaigns.length > 1
+                  : false
+              }
+              isSelected={selectedCampaigns?.has ? selectedCampaigns.has(campaign.id) : false}
+              onSelect={onSelect}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

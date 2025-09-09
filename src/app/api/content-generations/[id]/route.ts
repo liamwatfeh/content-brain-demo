@@ -8,10 +8,10 @@ const supabase = createClient(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -72,9 +72,9 @@ export async function GET(
       generated_content: campaign.generated_content,
       is_saved: campaign.is_saved,
       created_at: campaign.created_at,
-      whitepaper_title: campaign.whitepapers?.title,
-      whitepaper_filename: campaign.whitepapers?.filename,
-      whitepaper_file_url: campaign.whitepapers?.file_url,
+      whitepaper_title: campaign.whitepapers?.[0]?.title,
+      whitepaper_filename: campaign.whitepapers?.[0]?.filename,
+      whitepaper_file_url: campaign.whitepapers?.[0]?.file_url,
       content_items: campaign.content_items || [],
     };
 
@@ -90,10 +90,10 @@ export async function GET(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(

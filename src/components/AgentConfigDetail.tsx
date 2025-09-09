@@ -32,7 +32,7 @@ export default function AgentConfigDetail({ agentId }: AgentConfigDetailProps) {
   return (
     <div className="h-screen flex overflow-hidden bg-gray-50">
       {/* Sidebar */}
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <Sidebar />
 
       {/* Main content */}
       <div className="flex flex-col w-0 flex-1 overflow-hidden">

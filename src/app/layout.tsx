@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Unbounded, Archivo } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import React from "react";
 
 const inter = Inter({
   subsets: ["latin"],

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import {
   DocumentTextIcon,
@@ -140,12 +141,16 @@ function CustomCheckbox({
   onChange: (e: React.MouseEvent) => void;
   campaignName: string;
 }) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e as unknown as React.MouseEvent);
+  };
+
   return (
     <div className="relative">
       <input
         type="checkbox"
         checked={checked}
-        onChange={onChange}
+        onChange={handleChange}
         onClick={onChange}
         className="sr-only"
         aria-label={`Select ${campaignName}`}

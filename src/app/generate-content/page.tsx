@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -81,7 +81,7 @@ interface WorkflowState {
   searchesPerformed?: number;
 }
 
-export default function GenerateContentPage() {
+function GenerateContentPageContent() {
   const searchParams = useSearchParams();
   const preSelectedWhitepaperID = searchParams.get("whitepaper");
   const { isCollapsed, sidebarOpen, setSidebarOpen } = useSidebar();
@@ -2162,5 +2162,13 @@ export default function GenerateContentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function GenerateContentPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <GenerateContentPageContent />
+    </Suspense>
   );
 }
